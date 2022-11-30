@@ -6,12 +6,8 @@
 
 
 import paho.mqtt.client as mqtt
-from PyQt5.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
 import logging
-import time
-import random
-import configparser
-import shlex
+
 
 class MqttPublisher:
     def __init__(self, client_name, mqtt_broker, mqtt_port, mqtt_username, mqtt_passkey):
@@ -95,5 +91,8 @@ class MqttPublisher:
     def reinit(self):
         self.mqtt_client.reinitialise(client_id=self.Client_Name, clean_session=True)
 
+    def __del__(self):
+        self.mqtt_client.disconnect()
+        self.mqtt_client.__del__()
 
 #class end
