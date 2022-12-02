@@ -3,11 +3,21 @@
 # Sartorius Balance Import Software
 # intended for use at IPF Dresden
 # Revision: @ente504
-# 0.1: alpha version
+# 1.0: initial version
+
+"""
+The Software is intended for the use at the IPF Dresden as an import tool of taken weightings on Sartorius Balances
+(like the Sartorius Secura Lineup) to the Symate Detact System via MQTT.
+
+This Software can be configured throw an config.ini file located in the root folder of the application.
+An actual version is located at GitHub:
+
+https://github.com/ente504/Sartorius_Balance/tree/master
+"""
 
 
 import logging
-from PyQt5.QtCore import QObject, QThread, pyqtSlot, QTimer
+from PyQt5.QtCore import QTimer, Qt
 import sys
 import os
 import time
@@ -51,7 +61,6 @@ path = ""
 construct SpecimenDataFrame:
 The Specimen Dataframe contains the relevant Data
 The contained Data in this Dataframe is of Type String
-The order of the Elements is to be respected 0 to 6]
 The Names are taken from the SpecimenNameFrame
 """
 
@@ -72,15 +81,6 @@ def reset_SpecimenDataFrame():
 
     SpecimenDataFrame = []
     SpecimenDataFrame = [SpecimenNameList, SpecimenDataList]
-
-
-def publish_stuff():
-    # publish on MQTT
-    if str(SpecimenDataFrame[1][0]) not in ["", " ", "none", "None", "False", "false"]:
-        logging.info(build_json(SpecimenDataFrame))
-        Client.publish(BaseTopic, build_json(SpecimenDataFrame))
-        print(SpecimenDataFrame[1])
-        time.sleep(0.1)
 
 
 def timestamp():
@@ -132,6 +132,7 @@ class Window(QMainWindow):
         methode builds the pyqt GUI then the Window class is initialised
         """
 
+        # define window
         self.setWindowTitle("Sartorius Balance Import Tool")
         self.resize(400, 250)
         self.centralWidget = QWidget()
@@ -157,10 +158,11 @@ class Window(QMainWindow):
         self.Button_Send_Data = QPushButton("send Data to Detact", self)
         self.Button_Send_Data.clicked.connect(self.send_Data)
         self.Button_Send_Data.setStyleSheet("background-color: lightgreen")
-        # TODO: figure out how to connect the Button with the Enter Key
+        self.Button_Send_Data.setToolTip("Use F5 Key as shortcut to this function")
         self.Button_Send_Data.setAutoDefault(True)
         self.Button_Send_Data.setDefault(True)
         self.Button_Send_Data.setFixedHeight(40)
+
         self.Sample_ID_Group = QGroupBox("Sample ID", self)
         self.Weight_Group = QGroupBox("weight from Balance", self)
         self.send_Data_Goup = QGroupBox("Data to transmit", self)
@@ -217,41 +219,54 @@ class Window(QMainWindow):
             self.Weight_Label.repaint()
 
     def open_readme(self):
-
+        """
+        opens readme file in the root folder of the application
+        """
         global Readme_Path
+
         try:
             os.startfile(Readme_Path)
         except Exception:
             logging.error("readme file was not found")
 
     def clear_SampleID_Edit(self):
+        """
+        clears content of the Edit_Sample_ID QLineEdit
+        """
         self.Edit_Sample_ID.clear()
         self.Edit_Sample_ID.setFocus()
 
     def clear_weight_Edit(self):
+        """
+        clears content of the Edit_weight QLineEdit
+        """
         self.Edit_weight.clear()
         self.Edit_weight.setFocus()
 
     def prozess_weight_input(self, input_string):
+        """
+        the method processes the inputstring comming from the scale to a more readable form
+        :param input_string: String found inside the Edit_weight QLineEdit Type: String
+        :return: modified more readable version of the input String. Type: String
+        """
         return_string = " "
+        first_letters_cut = ""
 
         try:
             if input_string != "":
                 if input_string[0] == "`":
                     try:
                         first_letters_cut = input_string[1:]
-                        #last_letters_cut = first_letters_cut[:-1]
                     except:
-                        logging.error("error while prozessing information from the Weight input")
+                        logging.error("error while processing information from the Weight input (positive value => ´)")
 
                     return_string = float(first_letters_cut)
 
                 if input_string[0] == "ß":
                     try:
                         first_letters_cut = input_string[3:]
-                        #last_letters_cut = first_letters_cut[:-1]
                     except:
-                        logging.error("error while prozessing information from the Weight input")
+                        logging.error("error while processing information from the Weight input (negative value => ß")
 
                     return_string = float("-" + first_letters_cut)
 
@@ -260,11 +275,14 @@ class Window(QMainWindow):
             else:
                 return_string = " "
         except:
-            logging.error("error while processing string: String probably not long enough")
+            logging.error("error while processing string: String probably not long enough.")
         return return_string
 
     def send_Data(self):
-
+        """
+        the methode updates the SpecimenDataFrame and publishes the updated SpecimenDataFrame to the in the config.ini
+        specified MQTT Broker. After Publishing the SpecimenDataFrame is reset tu default values.
+        """
         if self.Edit_Sample_ID.text() not in ["", " "] and self.Edit_weight.text() not in ["", " "]:
 
             # Get Data into the SpecimenDataFrame
@@ -294,6 +312,7 @@ class Window(QMainWindow):
 
             reset_SpecimenDataFrame()
 
+            # inform user about missing input Data
             self.Edit_weight.clear()
             self.Edit_Sample_ID.clear()
             self.Weight_Label.setText("Weight: -")
@@ -304,6 +323,14 @@ class Window(QMainWindow):
             msg.setWindowTitle("invalid data")
             msg.setText("please enter data into both text fields ")
             msg.exec()
+
+    def keyPressEvent(self, e):
+        """
+        Method detects keypress event from the Keyboard and connects the Key F5 to the send_Data Methode
+        :param e: pressed Key
+        """
+        if e.key() == Qt.Key_F5:
+            self.send_Data()
 
 
 # run application
